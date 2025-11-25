@@ -4,7 +4,7 @@
 
 The Swift port (`mlx-swift-lm`) is designed for deploying models on consumer devices (iOS/macOS apps). This context shapes what functionality matters most—efficient on-device inference, voice interaction capabilities, and responsive user experiences take priority over server infrastructure, batch processing, and developer tooling.
 
-The Swift port provides solid inference capabilities for popular model architectures. The most significant gap for consumer applications is audio functionality (TTS/STT), which would enable voice-based app experiences.
+The Swift port provides solid inference capabilities for popular model architectures. **Text-to-Speech (TTS) is now available** via the separate [mlx-audio](https://github.com/Blaizzy/mlx-audio) Swift library, which includes Kokoro, Orpheus, and streaming Marvis models. The remaining critical gap is **Speech-to-Text (STT)**—porting Whisper would complete the voice interaction story for consumer apps.
 
 ---
 
@@ -282,59 +282,59 @@ These are small/efficient VLMs ideal for mobile deployment:
 
 ---
 
-## 3. MLX Audio (Audio Models) - Critical Gap for Consumer Apps
+## 3. MLX Audio (Audio Models) - Separate Swift Library Available
 
-The Swift port has **zero audio functionality**. For consumer device deployment, this is the **most significant missing capability**—voice interaction is a core expectation for modern mobile/desktop apps.
+Audio functionality exists in a **separate Swift library**: [mlx-audio](https://github.com/Blaizzy/mlx-audio). This library provides TTS capabilities for iOS/macOS apps using MLX.
 
-### Missing TTS (Text-to-Speech) — All 9 Model Architectures
+### Swift TTS Implementations (in mlx-audio)
 
-| Model | Priority | Notes |
-|-------|----------|-------|
-| **Kokoro** | **Critical** | Fast, multilingual (EN/JP/ZH), high quality, 24kHz |
-| **Bark** | **High** | Zero-shot, expressive, voice cloning |
-| Sesame/CSM | Medium | Conversational speech model |
-| Spark | Medium | Multilingual with speaker encoding |
-| OuteTTS | Medium | LLM-based (Llama/Qwen backend) |
-| IndexTTS | Low | Speaker indexing, BigVGAN vocoder |
-| Dia | Low | Diffusion-based synthesis |
-| Llama TTS | Low | LLM-based |
+| Model | Status | Notes |
+|-------|--------|-------|
+| **Kokoro** | ✅ Implemented | Full phoneme-based TTS, multiple voices, 24kHz |
+| **Orpheus** | ✅ Implemented | Qwen2-based LLM + SNAC codec, 8 voices, emotional expressions |
+| **Marvis** | ✅ Implemented | Streaming TTS with Mimi codec, low-latency |
 
-### Missing STT (Speech-to-Text) — All 4 Model Architectures
+### Swift Audio Codecs (in mlx-audio)
 
-| Model | Priority | Notes |
-|-------|----------|-------|
-| **Whisper** | **Critical** | Universal ASR, 99+ languages, best accuracy, multiple sizes |
-| **Parakeet** | **High** | NVIDIA Conformer, fast, good for real-time |
-| Voxtral | Low | |
-| Wav2Vec | Low | Self-supervised, feature extraction |
+| Codec | Status | Notes |
+|-------|--------|-------|
+| **Mimi** | ✅ Implemented | Full streaming decoder, 24kHz, 8-32 codebooks |
+| **SNAC** | ✅ Implemented | Complete implementation for Orpheus |
 
-### Missing Audio Codecs — All 7 Implementations
+### Swift Audio Features (in mlx-audio)
 
-| Codec | Priority | Notes |
-|-------|----------|-------|
-| **Encodec** | **High** | Meta's neural codec, required by Bark |
-| **DAC** | **High** | Descript Audio Codec, required by OuteTTS |
-| BigVGAN | Medium | Vocoder, used by IndexTTS |
-| Vocos | Medium | Vocoder |
-| Mimi | Low | Multi-codec with transformer |
-| SNAC | Low | Scalable neural audio codec |
-| S3 | Low | Sparse spectrogram synthesizer |
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Streaming TTS | ✅ | Marvis with AsyncThrowingStream |
+| Audio playback | ✅ | AVAudioEngine integration |
+| Audio file saving | ✅ | Export capabilities |
+| Multiple voices | ✅ | 8+ voice options across models |
+| Emotional expressions | ✅ | Orpheus: laugh, sigh, cough, etc. |
 
-### Missing Audio Features — Complete List
+### Still Missing in Swift
 
-| Feature | Priority | Notes |
-|---------|----------|-------|
-| **Streaming TTS** | **Critical** | Real-time voice responses |
-| **Real-time transcription** | **Critical** | Voice input for apps |
-| **Audio preprocessing (STFT, mel filterbanks)** | **Critical** | Foundation for all audio models |
-| Voice activity detection (VAD) | High | Hands-free interaction |
-| Audio resampling | High | Sample rate conversion |
-| Audio normalization | Medium | Volume leveling |
-| Voice cloning | Medium | Personalized TTS |
-| Speech-to-speech pipeline | Medium | Full voice assistant pipeline |
-| Audio player/streaming | Medium | Playback utilities |
+| Model/Feature | Priority | Notes |
+|---------------|----------|-------|
+| **Whisper STT** | **Critical** | No Swift STT implementation yet |
+| **Parakeet STT** | **High** | Fast real-time transcription |
+| Voice activity detection | High | Hands-free interaction |
+| Bark TTS | Medium | Zero-shot, expressive (Python only) |
+| CSM/Sesame TTS | Medium | Voice cloning (Python only) |
 
-**Assessment:** Audio is the biggest gap. Whisper (STT) and Kokoro (TTS) would enable voice-first app experiences that users expect from modern applications. The audio preprocessing utilities (STFT, mel filterbanks) are foundational and needed before any audio model can work.
+### Python-Only Implementations (in mlx-audio)
+
+The Python side of mlx-audio has more extensive coverage:
+
+**TTS Models (Python):**
+- Kokoro, Bark, CSM/Sesame, Spark, OuteTTS, IndexTTS, Dia, Llama TTS
+
+**STT Models (Python):**
+- Whisper, Parakeet, Wav2Vec, Voxtral
+
+**Audio Codecs (Python):**
+- Mimi, SNAC, Encodec, DAC, BigVGAN, Vocos, S3
+
+**Assessment:** The mlx-audio Swift library provides solid TTS capabilities with Kokoro, Orpheus, and streaming Marvis. The critical remaining gap is **Speech-to-Text (STT)**—porting Whisper to Swift would complete the voice interaction story for consumer apps.
 
 ---
 
@@ -380,21 +380,20 @@ Python MLX LM provides embeddings through its server API using LLM models. Swift
 
 ## Priority Recommendations for Consumer Device Deployment
 
-### Audio (Critical Gap)
+### Audio (Partially Addressed via mlx-audio)
 
-Audio is the most significant missing capability for consumer apps.
+TTS is now available via the separate mlx-audio Swift library. STT remains the critical gap.
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| Critical | Whisper STT | Voice input, dictation, accessibility |
-| Critical | Kokoro TTS | Voice output, read-aloud, accessibility |
-| Critical | Audio preprocessing | STFT, mel filterbanks (foundation for all audio) |
-| High | Encodec/DAC codecs | Required by TTS models |
-| High | Streaming audio | Real-time voice interaction |
-| High | Parakeet STT | Fast real-time transcription |
-| Medium | Bark TTS | Expressive voice synthesis |
-| Medium | Voice activity detection | Hands-free interaction |
-| Low | Voice cloning | Personalized TTS voices |
+| Critical | **Whisper STT** | Voice input, dictation, accessibility — **not yet in Swift** |
+| High | Parakeet STT | Fast real-time transcription — **not yet in Swift** |
+| High | Voice activity detection | Hands-free interaction |
+| ✅ Done | Kokoro TTS | Available in mlx-audio Swift |
+| ✅ Done | Streaming TTS | Marvis in mlx-audio Swift |
+| ✅ Done | Audio codecs (Mimi, SNAC) | Available in mlx-audio Swift |
+| Medium | Bark TTS | Expressive voice synthesis (Python only) |
+| Low | Voice cloning | Personalized TTS voices (CSM in Python only) |
 
 ### LLM Generation Features
 
@@ -450,24 +449,31 @@ These can remain Python-only developer tools:
 |---------|--------|-------|----------|---------------------|
 | MLX LM | ~80 models | 36 models | ~45% | ✅ Good coverage of popular models |
 | MLX VLM | 32 models | 9 models | ~28% | ⚠️ Adequate, needs efficient VLMs |
-| MLX Audio | 20+ models | 0 | 0% | ❌ Critical gap for consumer apps |
+| MLX Audio TTS | 8 models | 3 models (mlx-audio) | ~38% | ✅ Kokoro, Orpheus, Marvis available |
+| MLX Audio STT | 4 models | 0 | 0% | ❌ Critical gap — needs Whisper |
+| Audio Codecs | 7 codecs | 2 codecs (mlx-audio) | ~29% | ✅ Mimi, SNAC available |
 | Embeddings | Via server | Dedicated library (15+ models) | ✅ | ✅ Swift has better support |
 
 ---
 
 ## Conclusion
 
-For consumer device deployment, the Swift port is **well-positioned for text-based LLM and VLM inference**. The library covers popular model architectures and has essential features like streaming generation, KV cache management, and quantized model support.
+For consumer device deployment, the Swift ecosystem is **well-positioned for text-based LLM and VLM inference**, and now has **solid TTS capabilities** via the mlx-audio library. The mlx-swift-lm library covers popular model architectures with essential features like streaming generation, KV cache management, and quantized model support.
 
-**The critical gap is audio functionality.** Voice interaction (STT + TTS) is a core expectation for modern mobile and desktop applications. Adding Whisper and Kokoro would unlock:
+**TTS is now available** via the separate [mlx-audio](https://github.com/Blaizzy/mlx-audio) Swift library:
+- Kokoro TTS (phoneme-based, multiple voices, 24kHz)
+- Orpheus TTS (LLM-based, emotional expressions, 8 voices)
+- Marvis TTS (streaming, low-latency with Mimi codec)
+- Audio codecs: Mimi (streaming) and SNAC
+
+**The remaining critical gap is Speech-to-Text (STT).** Porting Whisper to Swift would complete the voice interaction story and unlock:
 - Voice assistants
 - Dictation/transcription
-- Accessibility features (screen readers, voice control)
+- Accessibility features (voice control)
 - Hands-free interaction
-- Audio content creation
 
 **Recommended development focus:**
-1. **First:** Audio foundation (preprocessing utilities, Encodec/DAC codecs)
-2. **Then:** Whisper STT + Kokoro TTS
-3. **Next:** Speculative decoding + prompt cache persistence
-4. **Finally:** Mobile-efficient models (MiniCPM, Florence2, Phi3-V, Mamba)
+1. **Critical:** Whisper STT Swift port (enables full voice interaction)
+2. **High:** Speculative decoding + prompt cache persistence
+3. **High:** Mobile-efficient models (MiniCPM, Florence2, Phi3-V)
+4. **Medium:** Voice activity detection for hands-free interaction
