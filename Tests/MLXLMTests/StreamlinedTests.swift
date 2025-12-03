@@ -55,6 +55,20 @@ public class StreamlinedTests: XCTestCase {
         print(try await session.respond(to: "why is that?"))
         print(try await session.respond(to: "describe this image", image: .ciImage(CIImage.red)))
     }
+
+    /// Integration test for AfMoE (Trinity) model - downloads from HuggingFace
+    /// Run with: swift test --filter testAfMoETrinity
+    func testAfMoETrinity() async throws {
+        print("Loading mlx-community/Trinity-Nano-Preview-8bit...")
+        let model = try await loadModel(id: "mlx-community/Trinity-Nano-Preview-8bit")
+
+        print("Model loaded, testing generation...")
+        let session = ChatSession(model)
+        let response = try await session.respond(to: "Hello, what are you?")
+
+        print("Response: \(response)")
+        XCTAssertFalse(response.isEmpty)
+    }
 }
 
 private struct TestUserInputProcessor: UserInputProcessor {
