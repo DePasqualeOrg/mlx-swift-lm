@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import MLX
+@preconcurrency import MLX
 import MLXNN
 
 /// Configuration for how LoRA or DoRA should be applied.
