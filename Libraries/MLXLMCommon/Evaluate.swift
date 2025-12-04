@@ -1,7 +1,7 @@
 // Copyright © 2024 Apple Inc.
 
 import Foundation
-import MLX
+@preconcurrency import MLX
 import Tokenizers
 
 /// A `LogitSampler` is responsible for sampling `logits` produced by
@@ -616,7 +616,7 @@ public func generate(
     var promptTime: TimeInterval = 0
 
     let additionalEOSTokenIds = Set(
-        (context.configuration.extraEOSTokens ?? [])
+        (context.configuration.extraEOSTokens)
             .compactMap {
                 context.tokenizer.convertTokenToId($0)
             })
@@ -705,7 +705,7 @@ public func generate(
     var promptTime: TimeInterval = 0
 
     let additionalEOSTokenIds = Set(
-        (context.configuration.extraEOSTokens ?? [])
+        (context.configuration.extraEOSTokens)
             .compactMap {
                 context.tokenizer.convertTokenToId($0)
             })
