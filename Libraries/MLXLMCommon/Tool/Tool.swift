@@ -14,7 +14,7 @@ public struct Tool<Input: Codable, Output: Codable>: ToolProtocol {
     public let schema: ToolSpec
 
     /// The handler for the tool.
-    public let handler: (Input) async throws -> Output
+    public let handler: @Sendable (Input) async throws -> Output
 
     /// The name of the tool extracted from the schema
     public var name: String {
@@ -27,7 +27,7 @@ public struct Tool<Input: Codable, Output: Codable>: ToolProtocol {
         name: String,
         description: String,
         parameters: [ToolParameter],
-        handler: @escaping (Input) async throws -> Output
+        handler: @Sendable @escaping (Input) async throws -> Output
     ) {
         var properties = [String: Any]()
         var requiredParams = [String]()
@@ -55,7 +55,7 @@ public struct Tool<Input: Codable, Output: Codable>: ToolProtocol {
         self.handler = handler
     }
 
-    public init(schema: ToolSpec, handler: @escaping (Input) async throws -> Output) {
+    public init(schema: ToolSpec, handler: @Sendable @escaping (Input) async throws -> Output) {
         self.schema = schema
         self.handler = handler
     }
