@@ -18,7 +18,7 @@ public struct Tool<Input: Codable, Output: Codable>: ToolProtocol {
 
     /// The name of the tool extracted from the schema
     public var name: String {
-        let function = schema["function"] as? [String: Any]
+        let function = schema["function"] as? [String: any Sendable]
         let name = function?["name"] as? String
         return name ?? ""
     }
@@ -29,7 +29,7 @@ public struct Tool<Input: Codable, Output: Codable>: ToolProtocol {
         parameters: [ToolParameter],
         handler: @Sendable @escaping (Input) async throws -> Output
     ) {
-        var properties = [String: Any]()
+        var properties = [String: any Sendable]()
         var requiredParams = [String]()
 
         for param in parameters {
