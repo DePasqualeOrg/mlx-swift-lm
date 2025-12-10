@@ -4,61 +4,95 @@ import CoreGraphics
 import Foundation
 import MLX
 
-/// Implementation of simplified API -- see ``ChatSession``.
-private class Generator {
-    enum Model {
+/// Simplified API for multi-turn conversations with LLMs and VLMs.
+///
+/// For example:
+///
+/// ```swift
+/// let modelContainer = try await loadModelContainer(id: "mlx-community/Qwen3-4B-4bit")
+/// let session = ChatSession(modelContainer)
+/// print(try await session.respond(to: "What are two things to see in San Francisco?"))
+/// print(try await session.respond(to: "How about a great place to eat?"))
+/// ```
+///
+/// - Note: `ChatSession` is not thread-safe. Each session should be used from a single
+///   task/thread at a time. The underlying `ModelContainer` handles thread safety for
+///   model operations.
+public final class ChatSession {
+
+    private enum Model {
         case container(ModelContainer)
         case context(ModelContext)
     }
 
-    let model: Model
-    var messages = [Chat.Message]()
-    let processing: UserInput.Processing
-    let generateParameters: GenerateParameters
-    let additionalContext: [String: Any]?
-    var cache: [KVCache]
+    private let model: Model
+    private var messages: [Chat.Message]
+    private var cache: [KVCache]
+    private let processing: UserInput.Processing
+    private let generateParameters: GenerateParameters
+    private let additionalContext: [String: Any]?  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
 
-    init(
-        model: Model, instructions: String?, prompt: String, image: UserInput.Image?,
-        video: UserInput.Video?, processing: UserInput.Processing,
-        generateParameters: GenerateParameters,
-        additionalContext: [String: Any]?
+    /// Initialize the `ChatSession`.
+    ///
+    /// - Parameters:
+    ///   - model: the ``ModelContainer``
+    ///   - instructions: optional system instructions for the session
+    ///   - generateParameters: parameters that control generation
+    ///   - processing: media processing configuration for images/videos
+    ///   - additionalContext: optional model-specific context
+    public init(
+        _ model: ModelContainer,
+        instructions: String? = nil,
+        generateParameters: GenerateParameters = .init(),
+        processing: UserInput.Processing = .init(resize: CGSize(width: 512, height: 512)),
+        additionalContext: [String: Any]? = nil  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
     ) {
-        self.model = model
-        self.messages = []
-        if let instructions = instructions {
-            messages.append(.system(instructions))
-        }
-        messages.append(
-            .user(
-                prompt, images: image.flatMap { [$0] } ?? [], videos: video.flatMap { [$0] } ?? []))
+        self.model = .container(model)
+        self.messages = instructions.map { [.system($0)] } ?? []
+        self.cache = []
         self.processing = processing
         self.generateParameters = generateParameters
         self.additionalContext = additionalContext
-        self.cache = []
     }
 
-    init(
-        model: Model, instructions: String?, processing: UserInput.Processing,
-        generateParameters: GenerateParameters,
-        additionalContext: [String: Any]?
+    /// Initialize the `ChatSession`.
+    ///
+    /// - Parameters:
+    ///   - model: the ``ModelContext``
+    ///   - instructions: optional system instructions for the session
+    ///   - generateParameters: parameters that control generation
+    ///   - processing: media processing configuration for images/videos
+    ///   - additionalContext: optional model-specific context
+    public init(
+        _ model: ModelContext,
+        instructions: String? = nil,
+        generateParameters: GenerateParameters = .init(),
+        processing: UserInput.Processing = .init(resize: CGSize(width: 512, height: 512)),
+        additionalContext: [String: Any]? = nil  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
     ) {
-        self.model = model
-        if let instructions {
-            self.messages = [.system(instructions)]
-        } else {
-            self.messages = []
-        }
+        self.model = .context(model)
+        self.messages = instructions.map { [.system($0)] } ?? []
+        self.cache = []
         self.processing = processing
         self.generateParameters = generateParameters
         self.additionalContext = additionalContext
-        self.cache = []
     }
 
-    func generate() async throws -> String {
+    /// Produces a response to a prompt.
+    ///
+    /// - Parameters:
+    ///   - prompt: the user prompt
+    ///   - images: list of images (for use with VLMs)
+    ///   - videos: list of videos (for use with VLMs)
+    /// - Returns: the model's response
+    public func respond(
+        to prompt: String,
+        images: [UserInput.Image],
+        videos: [UserInput.Video]
+    ) async throws -> String {
+        messages.append(.user(prompt, images: images, videos: videos))
+
         func generate(context: ModelContext) async throws -> String {
-            // prepare the input -- first the structured messages,
-            // next the tokens
             let userInput = UserInput(
                 chat: messages, processing: processing, additionalContext: additionalContext)
             let input = try await context.processor.prepare(input: userInput)
@@ -67,161 +101,38 @@ private class Generator {
                 cache = context.model.newCache(parameters: generateParameters)
             }
 
-            // generate the output
             let iterator = try TokenIterator(
                 input: input, model: context.model, cache: cache, parameters: generateParameters)
             let result: GenerateResult = MLXLMCommon.generate(
                 input: input, context: context, iterator: iterator
             ) { _ in .more }
 
-            Stream.gpu.synchronize()
+            Stream().synchronize()
 
             return result.output
         }
 
+        let output: String
         switch model {
         case .container(let container):
-            return try await container.perform { context in
+            output = try await container.perform { context in
                 try await generate(context: context)
             }
         case .context(let context):
-            return try await generate(context: context)
-        }
-    }
-
-    func stream() -> AsyncThrowingStream<String, Error> {
-        func stream(
-            context: ModelContext,
-            continuation: AsyncThrowingStream<String, Error>.Continuation
-        ) async {
-            do {
-                // prepare the input -- first the structured messages,
-                // next the tokens
-                let userInput = UserInput(
-                    chat: messages, processing: processing, additionalContext: additionalContext)
-                let input = try await context.processor.prepare(input: userInput)
-
-                if cache.isEmpty {
-                    cache = context.model.newCache(parameters: generateParameters)
-                }
-
-                // stream the responses back
-                for await item in try MLXLMCommon.generate(
-                    input: input, cache: cache, parameters: generateParameters, context: context)
-                {
-                    if let chunk = item.chunk {
-                        continuation.yield(chunk)
-                    }
-                }
-
-                Stream.gpu.synchronize()
-
-                continuation.finish()
-            } catch {
-                continuation.finish(throwing: error)
-            }
+            output = try await generate(context: context)
         }
 
-        return AsyncThrowingStream { continuation in
-            Task { [model, continuation] in
-                switch model {
-                case .container(let container):
-                    await container.perform { context in
-                        await stream(context: context, continuation: continuation)
-                    }
-                case .context(let context):
-                    await stream(context: context, continuation: continuation)
-                }
-            }
-        }
-    }
-}
-
-/// Simplified API for loading models and preparing responses to prompts
-/// for both LLMs and VLMs.
-///
-/// For example:
-///
-/// ```swift
-/// let model = try await loadModel(id: "mlx-community/Qwen3-4B-4bit")
-/// let session = ChatSession(model)
-/// print(try await session.respond(to: "What are two things to see in San Francisco?")
-/// print(try await session.respond(to: "How about a great place to eat?")
-/// ```
-///
-/// This manages the chat context (KVCache) and can produce both single string responses or
-/// streaming responses.
-public class ChatSession {
-
-    private let generator: Generator
-
-    /// Initialize the `ChatSession`.
-    ///
-    /// - Parameters:
-    ///   - model: the ``ModelContainer``
-    ///   - instructions: optional instructions to the chat session, e.g. describing what type of responses to give
-    ///   - generateParameters: parameters that control the generation of output, e.g. token limits and temperature
-    ///   - processing: optional media processing instructions
-    ///   - additionalContext: optional context (model/tokenizer specific)
-    public init(
-        _ model: ModelContainer, instructions: String? = nil,
-        generateParameters: GenerateParameters = .init(),
-        processing: UserInput.Processing = .init(resize: CGSize(width: 512, height: 512)),
-        additionalContext: [String: Any]? = nil
-    ) {
-        self.generator = .init(
-            model: .container(model), instructions: instructions, processing: processing,
-            generateParameters: generateParameters, additionalContext: additionalContext)
-    }
-
-    /// Initialize the `ChatSession`.
-    ///
-    /// - Parameters:
-    ///   - model: the ``ModelContext``
-    ///   - instructions: optional instructions to the chat session, e.g. describing what type of responses to give
-    ///   - generateParameters: parameters that control the generation of output, e.g. token limits and temperature
-    ///   - processing: optional media processing instructions
-    ///   - additionalContext: optional context (model/tokenizer specific)
-    public init(
-        _ model: ModelContext, instructions: String? = nil,
-        generateParameters: GenerateParameters = .init(),
-        processing: UserInput.Processing = .init(resize: CGSize(width: 512, height: 512)),
-        additionalContext: [String: Any]? = nil
-    ) {
-        self.generator = .init(
-            model: .context(model), instructions: instructions, processing: processing,
-            generateParameters: generateParameters, additionalContext: additionalContext)
+        messages.append(.assistant(output))
+        return output
     }
 
     /// Produces a response to a prompt.
     ///
     /// - Parameters:
-    ///   - prompt: the prompt
-    ///   - images: list of image (for use with VLMs)
-    ///   - videos: list of video (for use with VLMs)
-    /// - Returns: response from the model
-    public func respond(
-        to prompt: String,
-        images: [UserInput.Image],
-        videos: [UserInput.Video]
-    ) async throws -> String {
-        generator.messages = [
-            .user(
-                prompt,
-                images: images,
-                videos: videos
-            )
-        ]
-        return try await generator.generate()
-    }
-
-    /// Produces a response to a prompt.
-    ///
-    /// - Parameters:
-    ///   - prompt: the prompt
-    ///   - images: optional image (for use with VLMs)
-    ///   - videos: optional video (for use with VLMs)
-    /// - Returns: response from the model
+    ///   - prompt: the user prompt
+    ///   - image: optional image (for use with VLMs)
+    ///   - video: optional video (for use with VLMs)
+    /// - Returns: the model's response
     public func respond(
         to prompt: String,
         image: UserInput.Image? = nil,
@@ -229,40 +140,49 @@ public class ChatSession {
     ) async throws -> String {
         try await respond(
             to: prompt,
-            images: image.flatMap { [$0] } ?? [],
-            videos: video.flatMap { [$0] } ?? []
+            images: image.map { [$0] } ?? [],
+            videos: video.map { [$0] } ?? []
         )
     }
 
-    /// Produces a response to a prompt.
+    /// Produces a streaming response to a prompt.
     ///
     /// - Parameters:
-    ///   - prompt: the prompt
-    ///   - images: list of image (for use with VLMs)
-    ///   - videos: list of video (for use with VLMs)
-    /// - Returns: a stream of tokens (as Strings) from the model
+    ///   - prompt: the user prompt
+    ///   - images: list of images (for use with VLMs)
+    ///   - videos: list of videos (for use with VLMs)
+    /// - Returns: a stream of string chunks from the model
     public func streamResponse(
         to prompt: String,
         images: [UserInput.Image],
         videos: [UserInput.Video]
     ) -> AsyncThrowingStream<String, Error> {
-        generator.messages = [
-            .user(
-                prompt,
-                images: images,
-                videos: videos
-            )
-        ]
-        return generator.stream()
+        messages.append(.user(prompt, images: images, videos: videos))
+
+        let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
+
+        let task = Task {
+            do {
+                try await self.performStreaming(continuation: continuation)
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+
+        continuation.onTermination = { _ in
+            task.cancel()
+        }
+
+        return stream
     }
 
-    /// Produces a response to a prompt.
+    /// Produces a streaming response to a prompt.
     ///
     /// - Parameters:
-    ///   - prompt: the prompt
+    ///   - prompt: the user prompt
     ///   - image: optional image (for use with VLMs)
     ///   - video: optional video (for use with VLMs)
-    /// - Returns: a stream of tokens (as Strings) from the model
+    /// - Returns: a stream of string chunks from the model
     public func streamResponse(
         to prompt: String,
         image: UserInput.Image? = nil,
@@ -270,8 +190,54 @@ public class ChatSession {
     ) -> AsyncThrowingStream<String, Error> {
         streamResponse(
             to: prompt,
-            images: image.flatMap { [$0] } ?? [],
-            videos: video.flatMap { [$0] } ?? []
+            images: image.map { [$0] } ?? [],
+            videos: video.map { [$0] } ?? []
         )
+    }
+
+    /// Clear the session history and cache, preserving system instructions.
+    public func clear() {
+        messages = messages.filter { $0.role == .system }
+        cache = []
+    }
+
+    // MARK: - Private
+
+    private func performStreaming(
+        continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) async throws {
+        func stream(context: ModelContext) async throws {
+            let userInput = UserInput(
+                chat: messages, processing: processing, additionalContext: additionalContext)
+            let input = try await context.processor.prepare(input: userInput)
+
+            if cache.isEmpty {
+                cache = context.model.newCache(parameters: generateParameters)
+            }
+
+            var fullResponse = ""
+            for await item in try MLXLMCommon.generate(
+                input: input, cache: cache, parameters: generateParameters, context: context
+            ) {
+                if let chunk = item.chunk {
+                    fullResponse += chunk
+                    continuation.yield(chunk)
+                }
+            }
+
+            Stream().synchronize()
+
+            messages.append(.assistant(fullResponse))
+            continuation.finish()
+        }
+
+        switch model {
+        case .container(let container):
+            try await container.perform { context in
+                try await stream(context: context)
+            }
+        case .context(let context):
+            try await stream(context: context)
+        }
     }
 }
