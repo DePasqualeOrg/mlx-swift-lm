@@ -71,4 +71,5 @@ public class SuScaledRoPE: Module {
 }
 
 /// Backward compatibility alias.
+@available(*, deprecated, renamed: "SuScaledRoPE")
 public typealias SuScaledRotaryEmbedding = SuScaledRoPE
