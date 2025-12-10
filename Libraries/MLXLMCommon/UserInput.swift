@@ -161,7 +161,7 @@ public struct UserInput {
     public var tools: [ToolSpec]?
 
     /// Additional values provided for the chat template rendering context
-    public var additionalContext: [String: Any]?  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
+    public var additionalContext: [String: any Sendable]?
     public var processing: Processing = .init()
 
     /// Initialize the `UserInput` with a single text prompt.
@@ -178,7 +178,7 @@ public struct UserInput {
     public init(
         prompt: String, images: [Image] = [Image](), videos: [Video] = [Video](),
         tools: [ToolSpec]? = nil,
-        additionalContext: [String: Any]? = nil  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
+        additionalContext: [String: any Sendable]? = nil
     ) {
         self.prompt = .chat([
             .user(prompt, images: images, videos: videos)
@@ -223,7 +223,7 @@ public struct UserInput {
     public init(
         messages: [Message], images: [Image] = [Image](), videos: [Video] = [Video](),
         tools: [ToolSpec]? = nil,
-        additionalContext: [String: Any]? = nil  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
+        additionalContext: [String: any Sendable]? = nil
     ) {
         self.prompt = .messages(messages)
         self.images = images
@@ -259,7 +259,7 @@ public struct UserInput {
         chat: [Chat.Message],
         processing: Processing = .init(),
         tools: [ToolSpec]? = nil,
-        additionalContext: [String: Any]? = nil  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
+        additionalContext: [String: any Sendable]? = nil
     ) {
         self.prompt = .chat(chat)
 
@@ -295,8 +295,8 @@ public struct UserInput {
         images: [Image] = [Image](),
         videos: [Video] = [Video](),
         processing: Processing = .init(),
-        tools: [ToolSpec]? = nil, additionalContext: [String: Any]? = nil
-    ) {  // TODO: Change `additionalContext` to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
+        tools: [ToolSpec]? = nil, additionalContext: [String: any Sendable]? = nil
+    ) {
         self.prompt = prompt
         switch prompt {
         case .text, .messages:

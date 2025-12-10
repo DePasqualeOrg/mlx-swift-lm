@@ -30,7 +30,7 @@ public final class ChatSession {
     private var cache: [KVCache]
     private let processing: UserInput.Processing
     private let generateParameters: GenerateParameters
-    private let additionalContext: [String: Any]?  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
+    private let additionalContext: [String: any Sendable]?
 
     /// Initialize the `ChatSession`.
     ///
@@ -45,7 +45,7 @@ public final class ChatSession {
         instructions: String? = nil,
         generateParameters: GenerateParameters = .init(),
         processing: UserInput.Processing = .init(resize: CGSize(width: 512, height: 512)),
-        additionalContext: [String: Any]? = nil  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
+        additionalContext: [String: any Sendable]? = nil
     ) {
         self.model = .container(model)
         self.messages = instructions.map { [.system($0)] } ?? []
@@ -68,7 +68,7 @@ public final class ChatSession {
         instructions: String? = nil,
         generateParameters: GenerateParameters = .init(),
         processing: UserInput.Processing = .init(resize: CGSize(width: 512, height: 512)),
-        additionalContext: [String: Any]? = nil  // TODO: Change to `[String: any Sendable]?` after update in swift-transformers (https://github.com/huggingface/swift-transformers/pull/298)
+        additionalContext: [String: any Sendable]? = nil
     ) {
         self.model = .context(model)
         self.messages = instructions.map { [.system($0)] } ?? []
