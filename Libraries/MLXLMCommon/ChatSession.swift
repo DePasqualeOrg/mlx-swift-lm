@@ -101,15 +101,18 @@ public final class ChatSession {
                 cache = context.model.newCache(parameters: generateParameters)
             }
 
-            let iterator = try TokenIterator(
-                input: input, model: context.model, cache: cache, parameters: generateParameters)
-            let result: GenerateResult = MLXLMCommon.generate(
-                input: input, context: context, iterator: iterator
-            ) { _ in .more }
+            var output = ""
+            for await generation in try MLXLMCommon.generate(
+                input: input, cache: cache, parameters: generateParameters, context: context
+            ) {
+                if let chunk = generation.chunk {
+                    output += chunk
+                }
+            }
 
             Stream().synchronize()
 
-            return result.output
+            return output
         }
 
         let output: String
