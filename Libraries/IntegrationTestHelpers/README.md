@@ -1,6 +1,6 @@
 # Integration Test Helpers
 
-`IntegrationTestHelpers` and `BenchmarkHelpers` provide shared test logic for verifying end-to-end model loading, inference, and performance. They are designed to be used by integration packages that supply their own `Downloader` and `TokenizerLoader` implementations.
+`IntegrationTestHelpers` and `BenchmarkHelpers` provide shared test logic for verifying end-to-end model loading, inference, tokenizer performance, and download performance. They are designed to be used by integration packages that supply their own `Downloader` and `TokenizerLoader` implementations.
 
 ## Integration packages
 
