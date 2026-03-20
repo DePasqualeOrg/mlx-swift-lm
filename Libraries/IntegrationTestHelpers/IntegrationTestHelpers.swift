@@ -340,6 +340,77 @@ private func streamAndCollect(
 
 public enum EmbedderTests {
 
+    public static func gemma3Embedder(
+        downloader: any Downloader, tokenizerLoader: any TokenizerLoader
+    ) async throws {
+        let modelId = "mlx-community/gemma-3-1b-it-qat-4bit"
+        print("Loading Gemma 3 embedding model: \(modelId)")
+        let modelContainer = try await MLXEmbedders.loadModelContainer(
+            from: downloader, using: tokenizerLoader, configuration: .init(id: modelId),
+            progressHandler: logProgress(modelId)
+        )
+        print("Loaded Gemma 3 embedding model: \(modelId)")
+
+        let inputs = [
+            "The Coca-Cola Company is a soft drink company based in Atlanta, Georgia, USA.",
+            "In the United States, PepsiCo Inc. is a leading soft drink company.",
+        ]
+
+        let resultEmbeddings = await modelContainer.perform {
+            (model: EmbeddingModel, tokenizer: Tokenizer, pooling: Pooling) -> [[Float]] in
+            let encoded = inputs.map {
+                tokenizer.encode(text: $0, addSpecialTokens: true)
+            }
+            let maxLength = encoded.reduce(into: 1) { acc, elem in
+                acc = max(acc, elem.count)
+            }
+
+            let padded = stacked(
+                encoded.map { elem in
+                    MLXArray(
+                        elem
+                            + Array(
+                                repeating: tokenizer.eosTokenId ?? 0,
+                                count: maxLength - elem.count))
+                })
+
+            let mask = (padded .!= (tokenizer.eosTokenId ?? 0))
+            let tokenTypes = MLXArray.zeros(like: padded)
+
+            let modelOutput = model(
+                padded, positionIds: nil, tokenTypeIds: tokenTypes, attentionMask: mask)
+
+            let result = pooling(
+                modelOutput,
+                normalize: true, applyLayerNorm: true
+            )
+            result.eval()
+            return result.map { $0.asArray(Float.self) }
+        }
+
+        try check(
+            resultEmbeddings.count == inputs.count,
+            "Should have one embedding per input, got \(resultEmbeddings.count)"
+        )
+        for embedding in resultEmbeddings {
+            try check(
+                embedding.count == 1152,
+                "Gemma 3 1B embedding size should be 1152, got \(embedding.count)"
+            )
+            let l2Norm = sqrt(embedding.map { $0 * $0 }.reduce(0, +))
+            try check(
+                abs(l2Norm - 1.0) < 0.05,
+                "Embeddings should be approximately L2-normalized, got L2 norm \(l2Norm)"
+            )
+        }
+
+        let similarity = zip(resultEmbeddings[0], resultEmbeddings[1]).map(*).reduce(0, +)
+        try check(
+            similarity > 0.0,
+            "Similarity between related sentences should be positive, got \(similarity)"
+        )
+    }
+
     public static func readmeExample(container: EmbeddingModelContainer) async throws {
         let searchInputs = [
             "search_query: Animals in Tropical Climates.",
