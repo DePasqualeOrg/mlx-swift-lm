@@ -31,7 +31,7 @@ let package = Package(
             targets: ["IntegrationTestHelpers"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.30.6"))
+        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.1"))
     ],
     targets: [
         .target(

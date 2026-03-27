@@ -987,7 +987,9 @@ public struct FastVLMProcessor: UserInputProcessor {
 
         if input.images.isEmpty {
             // No image scenario
-            let promptTokens = try tokenizer.applyChatTemplate(messages: messages)
+            let promptTokens = try tokenizer.applyChatTemplate(
+                messages: messages, tools: input.tools,
+                additionalContext: input.additionalContext)
             let tokensArray = MLXArray(promptTokens).expandedDimensions(axis: 0)
             let mask = ones(like: tokensArray)
             return LMInput(text: .init(tokens: tokensArray, mask: mask), image: nil)
@@ -998,7 +1000,9 @@ public struct FastVLMProcessor: UserInputProcessor {
         }
 
         // Unfortunately we don't have a "render" option in Tokenizers yet, so decoding
-        let promptTokens = try tokenizer.applyChatTemplate(messages: messages)
+        let promptTokens = try tokenizer.applyChatTemplate(
+            messages: messages, tools: input.tools,
+            additionalContext: input.additionalContext)
         let decoded = tokenizer.decode(tokenIds: promptTokens, skipSpecialTokens: false)
 
         // Find <image> and replace with token id -200

@@ -8,11 +8,18 @@ import MLXLMCommon
 struct TestTokenizer: MLXLMCommon.Tokenizer {
 
     let length = 8
+    let maxLength = 50
 
-    var vocabulary: [Int: String]
+    /// a token outside the range that the model will generate, see vocabularySize
+    let _eosTokenId = 101
+    let _unknownTokenId = 102
+
+    let vocabularySize: Int
+    let vocabulary: [Int: String]
 
     init(vocabularySize: Int = 100) {
         let letters = "abcdefghijklmnopqrstuvwxyz"
+        self.vocabularySize = vocabularySize
         self.vocabulary = Dictionary(
             uniqueKeysWithValues: (0 ..< vocabularySize)
                 .map { t in
@@ -29,24 +36,24 @@ struct TestTokenizer: MLXLMCommon.Tokenizer {
 
     func encode(text: String, addSpecialTokens: Bool) -> [Int] {
         (0 ..< length).map { _ in
-            Int.random(in: 0 ..< 100)
+            Int.random(in: 1 ..< vocabularySize)
         }
     }
 
     func decode(tokenIds: [Int], skipSpecialTokens: Bool) -> String {
         var tokenIds = tokenIds
-        if tokenIds.count > 50 {
-            tokenIds.append(19)
+        if tokenIds.count > maxLength {
+            tokenIds.append(_eosTokenId)
         }
         return tokenIds.map { convertIdToToken($0) ?? "" }.joined(separator: " ")
     }
 
     func convertTokenToId(_ token: String) -> Int? {
-        Int.random(in: 0 ..< 100)
+        Int.random(in: 1 ..< vocabularySize)
     }
 
     func convertIdToToken(_ id: Int) -> String? {
-        if id == 19 {
+        if id == eosTokenId {
             return "EOS"
         }
         return vocabulary[id]
@@ -54,7 +61,11 @@ struct TestTokenizer: MLXLMCommon.Tokenizer {
 
     var bosToken: String? = nil
     var eosToken: String? = nil
+    var eosTokenId: Int? { _eosTokenId }
+
     var unknownToken: String? = nil
+
+    var unknownTokenId: Int? { _unknownTokenId }
 
     func applyChatTemplate(
         messages: [[String: any Sendable]],
