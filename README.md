@@ -47,8 +47,8 @@ Then chose one of the methods below to select download and tokenizer implementat
 Then add your preferred tokenizer and downloader integrations, see [how to integrate mlx-swift-lm and downloaders/tokenizers](https://swiftpackageindex.com/ml-explore/mlx-swift-lm/main/documentation/mlxlmcommon/using#Integration-Packages):
 
 ```swift
-.package(url: "https://github.com/DePasqualeOrg/swift-tokenizers-mlx", from: "0.1.0"),
-.package(url: "https://github.com/DePasqualeOrg/swift-hf-api-mlx", from: "0.1.0"),
+.package(url: "https://github.com/DePasqualeOrg/swift-tokenizers-mlx", from: "0.2.0", traits: ["Swift"]),
+.package(url: "https://github.com/DePasqualeOrg/swift-hf-api-mlx", from: "0.2.0"),
 ```
 
 And add the libraries to your target:
@@ -59,7 +59,7 @@ And add the libraries to your target:
     dependencies: [
         .product(name: "MLXLLM", package: "mlx-swift-lm"),
         .product(name: "MLXLMTokenizers", package: "swift-tokenizers-mlx"),
-        .product(name: "MLXLMHuggingFace", package: "swift-hf-api-mlx"),
+        .product(name: "MLXLMHFAPI", package: "swift-hf-api-mlx"),
     ]),
 ```
 
@@ -70,8 +70,8 @@ This preserves parity with mlx-swift-lm 2.x.  Simply reference the huggingface p
 Add these to your dependencies:
 
 ```swift
-.package(url: "https://github.com/huggingface/swift-huggingface", upToNextMajor(from: "0.9.0")),
-.package(url: "https://github.com/huggingface/swift-transformers", upToNextMajor(from: "1.3.0")),
+.package(url: "https://github.com/huggingface/swift-huggingface", .upToNextMajor(from: "0.9.0")),
+.package(url: "https://github.com/huggingface/swift-transformers", .upToNextMajor(from: "1.3.0")),
 ```
 
 And add the libraries to your target:
